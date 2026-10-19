@@ -41,17 +41,19 @@ jobs:
           #   导致项目评估失败（Could not find method signingConfig()）。
           # 这里只需准备签名材料：
           #   1) jks 拷贝到模块目录（build.gradle 里 file('./TVBoxOSC.jks') 相对模块目录解析）
-          #   2) 向根 gradle.properties 追加签名属性（对所有子工程可见）
+          #   2) 向 Gradle 工程根 hin2n/Hin2n_android/gradle.properties 追加签名属性
+          #      （本仓库根目录不是 Gradle 工程根，gradlew/settings.gradle/gradle.properties 都在 hin2n/Hin2n_android 下）
           cp -f ${{ github.workspace }}/.github/workflows/TVBoxOSC.jks hin2n/Hin2n_android/app/TVBoxOSC.jks
-          sed -i '$a\RELEASE_STORE_FILE=./TVBoxOSC.jks'     ./gradle.properties
-          sed -i '$a\RELEASE_KEY_ALIAS=TVBoxOSC'            ./gradle.properties
-          sed -i '$a\RELEASE_STORE_PASSWORD=TVBoxOSC'       ./gradle.properties
-          sed -i '$a\RELEASE_KEY_PASSWORD=TVBoxOSC'         ./gradle.properties
+          sed -i '$a\RELEASE_STORE_FILE=./TVBoxOSC.jks'     hin2n/Hin2n_android/gradle.properties
+          sed -i '$a\RELEASE_KEY_ALIAS=TVBoxOSC'            hin2n/Hin2n_android/gradle.properties
+          sed -i '$a\RELEASE_STORE_PASSWORD=TVBoxOSC'       hin2n/Hin2n_android/gradle.properties
+          sed -i '$a\RELEASE_KEY_PASSWORD=TVBoxOSC'         hin2n/Hin2n_android/gradle.properties
 
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: 17
+          # 工程固定 Gradle 6.3 + AGP 4.0.0，Gradle 6.x 最高支持 Java 13，用 17 会直接失败
+          java-version: 11
 
       - name: Install NDK and CMake
         run: |
@@ -63,12 +65,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6.2.0
 
       - name: Build hin2n with Gradle
+        # Gradle 工程根是 hin2n/Hin2n_android（settings.gradle 只 include ':app'）
+        working-directory: hin2n/Hin2n_android
         run: |
           chmod +x gradlew
           set +e
-          # -Phin2nOnly：settings.gradle 只配置 :hin2n，跳过 :app/:quickjs/:pyramid
-          # （:pyramid 的 Chaquopy 评估需读根目录 local.properties，独立构建环境没有该文件）
-          ./gradlew :hin2n:assembleRelease -Phin2nOnly --build-cache --parallel --daemon --warning-mode all 2>&1 | tee gradle.log
+          ./gradlew :app:assembleRelease --build-cache --parallel --daemon --warning-mode all 2>&1 | tee gradle.log
           rc=${PIPESTATUS[0]}
           set -e
           if [ "$rc" -ne 0 ]; then
@@ -81,15 +83,15 @@ jobs:
         run: |
           rm -rf hin2n_apk/
           mkdir -p hin2n_apk/
-          for file in $(find ~ -path "*hin2n*" -name "*release*.apk" -print); do
-            base=$(basename "$file")
-            cp "$file" "hin2n_apk/hin2n_${{ env.tag }}.apk"
-            break
-          done
-          # 固定名副本（供 tvbox 内置 json 的 hin2n.apkUrl 永远指向此文件）
-          if [ -f "hin2n_apk/hin2n_${{ env.tag }}.apk" ]; then
-            cp -f "hin2n_apk/hin2n_${{ env.tag }}.apk" hin2n_apk/hin2n-latest.apk
+          APK=hin2n/Hin2n_android/app/build/outputs/apk/release/app-release.apk
+          if [ ! -f "$APK" ]; then
+            echo "未找到产物：$APK"
+            find hin2n/Hin2n_android/app/build/outputs -name '*.apk' -print || true
+            exit 1
           fi
+          cp "$APK" "hin2n_apk/hin2n_${{ env.tag }}.apk"
+          # 固定名副本（供 tvbox 内置 json 的 hin2n.apkUrl 永远指向此文件）
+          cp -f "hin2n_apk/hin2n_${{ env.tag }}.apk" hin2n_apk/hin2n-latest.apk
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v7
