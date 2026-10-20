@@ -49,25 +49,21 @@ jobs:
           sed -i '$a\RELEASE_STORE_PASSWORD=TVBoxOSC'       hin2n/Hin2n_android/gradle.properties
           sed -i '$a\RELEASE_KEY_PASSWORD=TVBoxOSC'         hin2n/Hin2n_android/gradle.properties
 
-      # ubuntu-latest 自带的 cmdline-tools（sdkmanager）由 Java 17 编译（class 61），
-      # 必须用 JDK 17 跑；而工程固定 Gradle 6.3 + AGP 4.0.0，Gradle 6.x 最高支持 Java 13。
-      # 因此先用 17 装 NDK/CMake，再切回 11 交给 Gradle（最后一次 setup-java 决定后续步骤的 JAVA_HOME）。
+      # 工具链：Gradle 8.7 + AGP 8.2.2 均要求 JDK 17；cmdline-tools（sdkmanager）也由 Java 17 编译，
+      # 因此全程单一 JDK 17（最后一次 setup-java 决定后续步骤的 JAVA_HOME）。
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 17
 
-      - name: Install NDK and CMake
+      - name: Install NDK, CMake and Android platform
         run: |
           set -e
           SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
-          "$SDK/cmdline-tools/latest/bin/sdkmanager" "ndk;25.2.9519653" "cmake;3.22.1"
-
-      - uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: 11
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" \
+            "ndk;25.2.9519653" "cmake;3.22.1" \
+            "platforms;android-34" "build-tools;34.0.0"
 
       - uses: gradle/actions/setup-gradle@v6.2.0
 

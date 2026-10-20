@@ -1,16 +1,18 @@
 // hin2n 独立组网 App：从 TVBox 内置模块拆分，兼容 Android 4.4+（手机+TV）
-apply plugin: 'com.android.application'
+plugins {
+    id 'com.android.application' version '8.2.2'
+}
 
 android {
     namespace 'wang.switchy.hin2n'
-    compileSdkVersion 34
+    compileSdk 34
     // 固定 NDK 版本，保证本地与 GitHub Actions（sdkmanager 安装同名版本）构建一致
     ndkVersion '25.2.9519653'
 
     defaultConfig {
         applicationId "wang.switchy.hin2n"
-        minSdkVersion 19
-        targetSdkVersion 28
+        minSdk 19
+        targetSdk 28
         versionCode 1
         versionName "1.0"
         ndk {
@@ -62,7 +64,7 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
 
-    lintOptions {
+    lint {
         checkReleaseBuilds false
         abortOnError false
     }

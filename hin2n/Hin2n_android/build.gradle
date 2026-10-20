@@ -1,21 +1,6 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
-
-buildscript {
-    repositories {
-        // jcenter 已永久关停（2022），老依赖（baoyz/wang.avi/yanzhenjie 等）走阿里云 jcenter 镜像
-        maven { url 'https://maven.aliyun.com/repository/public' }
-        maven { url 'https://maven.aliyun.com/repository/jcenter' }
-        maven { url 'https://maven.aliyun.com/repository/google' }
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath 'com.android.tools.build:gradle:4.0.0'
-        classpath 'org.greenrobot:greendao-gradle-plugin:3.3.0'
-        // NOTE: Do not place your application dependencies here. They belong
-        // in the individual module build.gradle files
-    }
-}
+// AGP 8.2.2 由 app/build.gradle 的 plugins {} DSL 声明（settings.gradle pluginManagement 解析），
+// 此处不再维护 buildscript classpath；greenDAO 插件已移除——生成类（DaoSession/DaoMaster 等）已提交进源码，构建期无需代码生成。
 
 allprojects {
     repositories {
@@ -29,6 +14,6 @@ allprojects {
     }
 }
 
-task clean(type: Delete) {
-    delete rootProject.buildDir
+tasks.register('clean', Delete) {
+    delete rootProject.layout.buildDirectory
 }
