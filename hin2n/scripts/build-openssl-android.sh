@@ -32,6 +32,12 @@ done
 if [ -z "$NDK" ]; then
     NDK="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-$HOME/Android/Sdk/ndk/$NDK_VER}}"
 fi
+# 必须显式导出给 OpenSSL 的 Configure：它靠 ANDROID_NDK_HOME/ANDROID_NDK_ROOT
+# 判断使用新版 NDK 布局；两者都未设置时会退回早已移除的 gcc 式工具链路径，
+# 直接报 “no NDK arm-linux-androideabi-gcc on $PATH”。
+export ANDROID_NDK_HOME="$NDK"
+export ANDROID_NDK_ROOT="$NDK"
+echo "使用 NDK: $NDK"
 HOST_TAG="${HOST_TAG:-linux-x86_64}"
 TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/$HOST_TAG"
 JOBS="$(nproc 2>/dev/null || echo 4)"
