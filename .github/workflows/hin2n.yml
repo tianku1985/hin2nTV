@@ -28,8 +28,9 @@ jobs:
           fetch-depth: 0
 
       - name: Build Tag
+        id: tag
         run: |
-          echo "tag=$(date +'%Y%m%d-%H%M')" >> $GITHUB_ENV
+          echo "name=$(date +'%Y%m%d-%H%M')" >> $GITHUB_OUTPUT
 
       - name: Release Apk Sign
         run: |
@@ -92,9 +93,9 @@ jobs:
             find hin2n/Hin2n_android/app/build/outputs -name '*.apk' -print || true
             exit 1
           fi
-          cp "$APK" "hin2n_apk/hin2n_${{ env.tag }}.apk"
+          cp "$APK" "hin2n_apk/hin2n_${{ steps.tag.outputs.name }}.apk"
           # 固定名副本（供 tvbox 内置 json 的 hin2n.apkUrl 永远指向此文件）
-          cp -f "hin2n_apk/hin2n_${{ env.tag }}.apk" hin2n_apk/hin2n-latest.apk
+          cp -f "hin2n_apk/hin2n_${{ steps.tag.outputs.name }}.apk" hin2n_apk/hin2n-latest.apk
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v7
@@ -102,15 +103,12 @@ jobs:
           name: hin2n
           path: hin2n_apk/*.apk
 
-      - name: Whether Or Not to Publish
-        if: ${{ inputs.donotpublish }}
-        run: |
-          echo "skip publish"
-          echo "tag=" >> $GITHUB_ENV
-
+      # 注意：不能用 ${{ env.tag }} 做 if 守卫——GITHUB_ENV 写入的值在 job 开始后
+      # 才可见，而步骤 if 条件在 job 开始时求值，导致 Release 恒被跳过。
+      # 故仅以 job 开始时即已知的 inputs.donotpublish 控制是否发布。
       - name: Release hin2n
         uses: ncipollo/release-action@v1
-        if: ${{ env.tag }}
+        if: ${{ !inputs.donotpublish }}
         with:
           name: hin2n-latest
           tag: hin2n-latest
@@ -118,3 +116,4 @@ jobs:
           removeArtifacts: true
           artifacts: |
             hin2n_apk/*.apk
+
