@@ -74,11 +74,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: hin2n/.openssl-build/out
-          key: openssl-1.1.1w-api19-21-ndk25.2-${{ runner.os }}-v1
+          key: openssl-1.1.1w-api19-21-ndk25.2-${{ runner.os }}-v2
 
       - name: Rebuild libcrypto.so with low Android API
-        # 脚本会回退使用 ANDROID_SDK_ROOT/ndk/25.2.9519653（上方 sdkmanager 已安装）
-        run: bash hin2n/scripts/build-openssl-android.sh
+        run: |
+          # 脚本内部优先选择 $ANDROID_SDK_ROOT/ndk/25.2.9519653（上方 sdkmanager 已安装），
+          # 忽略 runner 镜像预装的最新版 NDK（其默认 API 为 35，产物在老设备上无法加载）
+          bash hin2n/scripts/build-openssl-android.sh
 
       - uses: gradle/actions/setup-gradle@v6.2.0
 

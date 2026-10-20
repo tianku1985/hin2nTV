@@ -18,7 +18,20 @@ OPENSSL_VERSION="${OPENSSL_VERSION:-1.1.1w}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 JNI_LIBS="$ROOT/hin2n/Hin2n_android/app/src/main/jniLibs"
 WORK="${WORK:-$ROOT/hin2n/.openssl-build}"
-NDK="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}/ndk/25.2.9519653}}"
+# NDK 选择：优先用 SDK 里显式安装的 25.2（与 app 的 ndkVersion 一致，最高 API=33）。
+# CI runner 镜像会把 ANDROID_NDK_HOME 指向预装的最新 NDK（r27+，默认 API 35，
+# 已移除 API 19 支持），必须忽略它，否则编出来的库依旧无法在老设备加载。
+NDK_VER="25.2.9519653"
+NDK=""
+for _ndk_root in "${ANDROID_SDK_ROOT:-}" "${ANDROID_HOME:-}"; do
+    if [ -n "$_ndk_root" ] && [ -d "$_ndk_root/ndk/$NDK_VER" ]; then
+        NDK="$_ndk_root/ndk/$NDK_VER"
+        break
+    fi
+done
+if [ -z "$NDK" ]; then
+    NDK="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-$HOME/Android/Sdk/ndk/$NDK_VER}}"
+fi
 HOST_TAG="${HOST_TAG:-linux-x86_64}"
 TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/$HOST_TAG"
 JOBS="$(nproc 2>/dev/null || echo 4)"
@@ -73,6 +86,9 @@ build_abi() {
     else
         echo "[$abi] 以 API $api 重新编译 OpenSSL $OPENSSL_VERSION ..."
         fetch_tarball
+        # 快速失败：确认该 API 的 clang wrapper 在 NDK 里存在
+        [ -x "$TOOLCHAIN/bin/${triple}${api}-clang" ] \
+            || die "[$abi] NDK 中不存在 ${triple}${api}-clang（检查 NDK 版本/三元组拼写，32 位 ARM 是 armv7a-linux-androideabi）"
         rm -rf "$src"
         mkdir -p "$src"
         tar -xf "$TARBALL" -C "$src" --strip-components=1
@@ -82,9 +98,23 @@ build_abi() {
             # ANDROID_API + 带 API 后缀的 clang wrapper 双保险，
             # 确保 bionic 头文件按低 API 做可用性裁剪
             export ANDROID_API="$api"
+            # 注意：OpenSSL 的 android-* target 会忽略 CC 环境变量，自行选择
+            # “clang + NDK 最高 API”（上一次 CI 实测编译器是 ...-35-clang），
+            # 所以 Configure 完必须改写 Makefile 强制低 API，见下方 patch。
             CC="${triple}${api}-clang" ./Configure "android-$target" \
                 no-ssl3 no-comp no-hw no-engine \
                 --prefix="$out"
+
+            # 强制编译器为指定 API 的 clang wrapper（OpenSSL android target 不认 CC env）
+            sed -i -E "s|^CC[[:space:]]*=.*|CC = ${triple}${api}-clang|" Makefile
+            # 清掉配置可能自带的高 API --target / __ANDROID_API__（后出现者优先，防止覆盖 wrapper 的低 API）
+            sed -i -E "s|--target=[A-Za-z0-9_.-]+|--target=${triple}${api}|g" Makefile
+            sed -i -E "s|-D__ANDROID_API__=[0-9]+|-D__ANDROID_API__=${api}|g" Makefile
+
+            echo "[$abi] Makefile 编译器: $(grep -E '^CC[[:space:]]*=' Makefile | head -n1)"
+            grep -qE "^CC[[:space:]]*=.*${triple}${api}-clang" Makefile \
+                || die "[$abi] Makefile CC 未指向 ${triple}${api}-clang，无法保证产物可在 API $api 设备加载"
+
             make -j"$JOBS" SHLIB_VERSION_NUMBER= SHLIB_EXT=.so build_libs
         )
         rm -rf "$out"
@@ -110,8 +140,8 @@ build_abi() {
     echo "[$abi] 已安装到 $JNI_LIBS/$abi"
 }
 
-build_abi armeabi-v7a arm    armv7a-linux-android 19
-build_abi arm64-v8a    arm64  aarch64-linux-android 21
-build_abi x86          x86    i686-linux-android    19
-build_abi x86_64       x86_64 x86_64-linux-android  21
+build_abi armeabi-v7a arm    armv7a-linux-androideabi 19
+build_abi arm64-v8a    arm64  aarch64-linux-android   21
+build_abi x86          x86    i686-linux-android      19
+build_abi x86_64       x86_64 x86_64-linux-android    21
 echo "全部 ABI 的 libcrypto.so 已更新：$JNI_LIBS"
