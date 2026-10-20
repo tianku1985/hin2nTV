@@ -2936,8 +2936,7 @@ int main(int argc, char **argv)
 
         return 0;
 }
-#endif /* #ifndef __ANDROID_NDK__ */
-#else /* #ifdef __ANDROID_NDK__ */
+#else /* #ifndef __ANDROID_NDK__ */
 int start_edge_v2s(n2n_edge_status_t* status)
 {
     int     local_port = 0 /* any port */;
