@@ -129,6 +129,12 @@ public class Hin2nCore {
                         err.append("; ");
                     }
                     err.append(lib).append(": ").append(t.getClass().getSimpleName());
+                    // 带上 dlopen 的具体原因（如 cannot locate symbol "getentropy" ... libcrypto.so），
+                    // 否则仅凭 UnsatisfiedLinkError 无法区分“缺库”还是“库依赖了新系统符号”
+                    String msg = t.getMessage();
+                    if (msg != null && msg.length() > 0) {
+                        err.append(" (").append(msg).append(")");
+                    }
                     Log.e(TAG, "loadLibrary(" + lib + ") failed", t);
                 }
             }

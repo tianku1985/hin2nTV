@@ -66,6 +66,20 @@ jobs:
             "ndk;25.2.9519653" "cmake;3.22.1" \
             "platforms;android-34" "build-tools;34.0.0"
 
+      # 仓库预置的 libcrypto.so 用高 API level 编译（引用 getentropy 等新符号 + DF_1_NOW），
+      # 在 Android 9 及以下设备（多为 32 位盒子）上 dlopen 直接失败，
+      # 导致 edge_v2/edge_v3/edge_jni 抛 UnsatisfiedLinkError。
+      # 这里用 minSdk 对应的 API（32 位 19 / 64 位 21）重建后覆盖 jniLibs。
+      - name: Cache OpenSSL build
+        uses: actions/cache@v4
+        with:
+          path: hin2n/.openssl-build/out
+          key: openssl-1.1.1w-api19-21-ndk25.2-${{ runner.os }}-v1
+
+      - name: Rebuild libcrypto.so with low Android API
+        # 脚本会回退使用 ANDROID_SDK_ROOT/ndk/25.2.9519653（上方 sdkmanager 已安装）
+        run: bash hin2n/scripts/build-openssl-android.sh
+
       - uses: gradle/actions/setup-gradle@v6.2.0
 
       - name: Build hin2n with Gradle
@@ -96,6 +110,16 @@ jobs:
           cp "$APK" "hin2n_apk/hin2n_${{ steps.tag.outputs.name }}.apk"
           # 固定名副本（供 tvbox 内置 json 的 hin2n.apkUrl 永远指向此文件）
           cp -f "hin2n_apk/hin2n_${{ steps.tag.outputs.name }}.apk" hin2n_apk/hin2n-latest.apk
+          # 端到端兜底：确认打进 APK 的 libcrypto.so 已是低 API 版本
+          #（不再引用 getentropy/__register_atfork 等新系统符号，否则老设备仍会 dlopen 失败）
+          NM="${ANDROID_SDK_ROOT:-$ANDROID_HOME}/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          unzip -p "$APK" lib/armeabi-v7a/libcrypto.so > /tmp/libcrypto-check.so
+          BAD="$("$NM" -D /tmp/libcrypto-check.so | awk '$(NF-1)=="U"{sub(/@.*/,"",$NF);print $NF}' | grep -E '^(getentropy|getrandom|__register_atfork)$' || true)"
+          if [ -n "$BAD" ]; then
+            echo "APK 内 armeabi-v7a/libcrypto.so 仍是高 API 版本，引用了：$BAD"
+            exit 1
+          fi
+          echo "APK 内 armeabi-v7a/libcrypto.so 符号校验通过（可用于老设备）"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v7
