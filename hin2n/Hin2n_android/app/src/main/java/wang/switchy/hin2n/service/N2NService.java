@@ -212,10 +212,14 @@ public class N2NService extends VpnService {
                             EventBus.getDefault().post(new ErrorEvent());
                         }
                     } catch (Throwable t) {
-                        // 典型场景：native 库未随 APK 打包或加载失败（UnsatisfiedLinkError）
+                        // 典型场景：native 库未随 APK 打包或加载失败（UnsatisfiedLinkError）。
+                        // 重试加载一次并给出具体失败库名，便于定位 32 位/64 位兼容问题。
+                        wang.switchy.hin2n.Hin2nCore.loadLibraries();
+                        String loadErr = wang.switchy.hin2n.Hin2nCore.loadError();
                         Log.e("N2NService", "startEdge failed", t);
                         appendEdgeLog("[启动失败] " + t.getClass().getSimpleName() + ": " + t.getMessage()
-                                + "（若为 UnsatisfiedLinkError，请确认 APK 内包含 libedge.so 等 hin2n native 库）");
+                                + (loadErr != null ? ("；native 库加载失败: " + loadErr) : "")
+                                + "（若为 UnsatisfiedLinkError，请确认 APK 内含对应 ABI 的 libedge.so 等 hin2n native 库）");
                         EventBus.getDefault().post(new ErrorEvent());
                     }
                 }
@@ -238,7 +242,9 @@ public class N2NService extends VpnService {
                 if (dir != null && !dir.exists()) {
                     dir.mkdirs();
                 }
-                java.io.FileWriter w = new java.io.FileWriter(f, true);
+                // 显式 UTF-8 追加，避免平台默认编码差异导致中文日志乱码（读取端 IOUtils 亦按 UTF-8 解码）
+                java.io.OutputStreamWriter w = new java.io.OutputStreamWriter(
+                        new java.io.FileOutputStream(f, true), java.nio.charset.Charset.forName("UTF-8"));
                 w.append(line).append("\n");
                 w.close();
             }

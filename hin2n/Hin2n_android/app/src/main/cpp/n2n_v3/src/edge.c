@@ -980,6 +980,7 @@ BOOL WINAPI term_handler(DWORD sig)
 /* *************************************************** */
 
 /** Entry point to program from kernel. */
+#ifndef __ANDROID_NDK__
 int main (int argc, char* argv[]) {
 
     int rc;
@@ -1362,5 +1363,6 @@ int main (int argc, char* argv[]) {
 
     return(rc);
 }
+#endif /* #ifndef __ANDROID_NDK__ */
 
 /* ************************************** */

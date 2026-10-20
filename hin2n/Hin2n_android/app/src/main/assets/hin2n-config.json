@@ -27,7 +27,7 @@
       "traceLevel": 2,
       "gatewayIp": "",
       "dnsServer": "",
-      "encryptionMode": "Twofish",
+      "encryptionMode": "AES-CBC",
       "headerEnc": false
     }
   ]

@@ -385,7 +385,8 @@ public class Hin2nActivity extends BaseActivity implements View.OnClickListener 
                 BufferedReader reader = null;
                 try {
                     Process p = Runtime.getRuntime().exec(new String[]{"ping", "-c", "4", "-W", "2", host});
-                    reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+                    reader = new BufferedReader(new InputStreamReader(p.getInputStream(),
+                            java.nio.charset.Charset.forName("UTF-8")));
                     String line;
                     while ((line = reader.readLine()) != null) {
                         sb.append(line).append('\n');

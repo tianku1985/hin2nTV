@@ -72,6 +72,7 @@ public class Hin2nCore {
     };
 
     private static volatile boolean sLoaded = false;
+    private static volatile String sLoadError = null;
 
     private static Context sApp;
     private static DaoMaster.DevOpenHelper sHelper;
@@ -108,7 +109,7 @@ public class Hin2nCore {
         }
     }
 
-    /** 逐个加载 n2n 原生库（幂等） */
+    /** 逐个加载 n2n 原生库（幂等；只有全部成功才算加载完成，失败可重试） */
     public static void loadLibraries() {
         if (sLoaded) {
             return;
@@ -117,15 +118,33 @@ public class Hin2nCore {
             if (sLoaded) {
                 return;
             }
+            boolean allOk = true;
+            StringBuilder err = new StringBuilder();
             for (String lib : NATIVE_LIBS) {
                 try {
                     System.loadLibrary(lib);
                 } catch (Throwable t) {
+                    allOk = false;
+                    if (err.length() > 0) {
+                        err.append("; ");
+                    }
+                    err.append(lib).append(": ").append(t.getClass().getSimpleName());
                     Log.e(TAG, "loadLibrary(" + lib + ") failed", t);
                 }
             }
-            sLoaded = true;
+            if (allOk) {
+                sLoaded = true;
+                sLoadError = null;
+            } else {
+                // 记录失败明细，保持 sLoaded=false，下次调用可重试（如后台预热早于库完整解压）
+                sLoadError = err.toString();
+            }
         }
+    }
+
+    /** 最近一次原生库加载失败明细（null=正常）；供界面/日志诊断 32 位/64 位加载问题 */
+    public static String loadError() {
+        return sLoadError;
     }
 
     public static Context context() {
