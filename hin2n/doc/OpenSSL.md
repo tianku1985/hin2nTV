@@ -37,26 +37,34 @@ GitHub Actions（`.github/workflows/hin2n.yml`）在 Gradle 构建前自动执�
 ```bash
 # 参考
 # https://wiki.openssl.org/index.php/Android
+# 注意：NDK r26+ 已移除 API 19 支持，必须用 25.x（与 app 的 ndkVersion 一致）
 export ANDROID_NDK_HOME=/path/to/android-sdk/ndk/25.2.9519653
 export PATH="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
 tar -xf openssl-1.1.1w.tar.gz && cd openssl-1.1.1w
 
-# 32 位必须指定 API 19，64 位指定 API 21；SHLIB_* 覆盖用于得到不带版本号的 libcrypto.so
-make clean
-CC=armv7a-linux-androideabi19-clang ANDROID_API=19 \
-  ./Configure android-arm no-ssl3 no-comp no-hw no-engine
+# OpenSSL 的 android-* target 会忽略 CC 环境变量，自行选择“clang + NDK 最高 API”，
+# 所以 Configure 后必须改写 Makefile，把编译器强制成带低 API 后缀的 wrapper。
+./Configure android-arm no-ssl3 no-comp no-hw no-engine --prefix="$PWD/out-arm"
+sed -i -E "s|^CC[[:space:]]*=.*|CC = armv7a-linux-androideabi19-clang|" Makefile
+sed -i -E "s|--target=[A-Za-z0-9_.-]+|--target=armv7a-linux-androideabi19|g" Makefile
+sed -i -E "s|-D__ANDROID_API__=[0-9]+|-D__ANDROID_API__=19|g" Makefile
+grep -E '^CC[[:space:]]*=' Makefile   # 确认是 armv7a-linux-androideabi19-clang
 make -j`nproc` SHLIB_VERSION_NUMBER= SHLIB_EXT=.so build_libs
 
-# 其余 ABI 同理：
-#   arm64 : CC=aarch64-linux-android21-clang     ANDROID_API=21 ./Configure android-arm64
-#   x86   : CC=i686-linux-android19-clang        ANDROID_API=19 ./Configure android-x86
-#   x86_64: CC=x86_64-linux-android21-clang      ANDROID_API=21 ./Configure android-x86_64
+# 其余 ABI 同理（把上面的 triple/API 换成）：
+#   arm64 : aarch64-linux-android21-clang     API 21  ./Configure android-arm64
+#   x86   : i686-linux-android19-clang        API 19  ./Configure android-x86
+#   x86_64: x86_64-linux-android21-clang      API 21  ./Configure android-x86_64
 ```
 
-产物校验（确认能在老设备上加载）：
+产物校验（确认能在老设备上加载；`<triple>` 换成对应 ABI）：
 
 ```bash
-$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm -D libcrypto.so \
-  | awk '$2=="U"{print $3}' | grep -E 'getentropy|__register_atfork'
-# 期望：无输出
+NM=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm
+# 1) 不应引用老系统 libc 没有的新 API 符号（期望：无输出）
+$NM -D libcrypto.so | awk '$(NF-1)=="U"{sub(/@.*/,"",$NF);print $NF}' \
+  | grep -E 'getentropy|getrandom|__register_atfork'
+# 2) 必须导出 n2n 直接引用的核心符号（期望：每个都出现）
+$NM -D --defined-only libcrypto.so | awk '{sub(/@.*/,"",$NF);print $NF}' \
+  | grep -E 'EVP_CIPHER_CTX_reset|EVP_CIPHER_CTX_new|EVP_aes_256_cbc'
 ```

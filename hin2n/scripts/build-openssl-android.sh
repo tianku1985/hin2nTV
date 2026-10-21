@@ -38,6 +38,15 @@ fi
 export ANDROID_NDK_HOME="$NDK"
 export ANDROID_NDK_ROOT="$NDK"
 echo "使用 NDK: $NDK"
+# NDK r26+ 已移除 API 19/20 支持（最低 API 21），无法为 32 位老设备产出可加载的库
+if [ -f "$NDK/source.properties" ]; then
+    _rev="$(sed -n 's/^Pkg\.Revision[[:space:]]*=[[:space:]]*//p' "$NDK/source.properties")"
+    echo "NDK Pkg.Revision: $_rev"
+    case "$_rev" in
+        25.*|24.*|23.*|22.*|21.*) ;;
+        *) die "NDK $_rev 不支持 API 19（r26+ 最低 API 21），请改用 25.2.9519653" ;;
+    esac
+fi
 HOST_TAG="${HOST_TAG:-linux-x86_64}"
 TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/$HOST_TAG"
 JOBS="$(nproc 2>/dev/null || echo 4)"
@@ -49,6 +58,13 @@ URLS=(
 )
 # 这些符号只在较新的 Android 版本的 libc 中存在，出现任意一个即判定为不可用于老设备
 NEW_API_SYMBOLS='^(getentropy|getrandom|__register_atfork|pthread_getname_np|arc4random_buf|closefrom)$'
+# libcrypto 必须对外导出的核心符号（n2n 源码直接引用；缺失会导致 edge_v2/edge_v3 加载失败）
+REQUIRED_SYMBOLS=(
+    EVP_CIPHER_CTX_reset EVP_CIPHER_CTX_new
+    EVP_EncryptInit_ex EVP_DecryptInit_ex
+    EVP_CipherUpdate EVP_CipherFinal_ex
+    EVP_aes_128_cbc EVP_aes_256_cbc
+)
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
@@ -57,7 +73,25 @@ NM="$TOOLCHAIN/bin/llvm-nm"
 READELF="$TOOLCHAIN/bin/llvm-readelf"
 [ -x "$NM" ] || die "未找到 $NM"
 
-# 校验 libcrypto.so 是否只引用老设备上存在的 libc 符号；返回 0 表示可用
+# 可用的对外导出符号列表
+libcrypto_defined_syms() {
+    "$NM" -D --defined-only "$1" 2>/dev/null | awk '{ sub(/@.*/, "", $NF); print $NF }'
+}
+
+# 逐个校验必需符号是否齐全，缺失则打印并返回 1
+check_required_syms() {
+    local lib="$1" sym missing="" have
+    have="$(libcrypto_defined_syms "$lib")"
+    for sym in "${REQUIRED_SYMBOLS[@]}"; do
+        printf '%s\n' "$have" | grep -qx "$sym" || missing="$missing $sym"
+    done
+    if [ -n "$missing" ]; then
+        echo "[$(basename "$(dirname "$lib")")] libcrypto.so 缺少必需导出符号：$missing" >&2
+        return 1
+    fi
+}
+
+# 校验缓存/产物是否可复用：不引用新 API 符号，且所有必需符号都已导出
 libcrypto_ok() {
     local lib="$1" bad
     [ -s "$lib" ] || return 1
@@ -65,7 +99,8 @@ libcrypto_ok() {
     bad="$("$NM" -D "$lib" 2>/dev/null \
         | awk '$(NF-1) == "U" { sub(/@.*/, "", $NF); print $NF }' \
         | grep -E "$NEW_API_SYMBOLS" || true)"
-    [ -z "$bad" ]
+    [ -z "$bad" ] || return 1
+    check_required_syms "$lib"
 }
 
 fetch_tarball() {
@@ -86,11 +121,18 @@ build_abi() {
     local abi="$1" target="$2" triple="$3" api="$4"
     local out="$WORK/out/$abi"
     local src="$WORK/src-$abi"
+    local stamp="$out/.built-api"
 
-    if libcrypto_ok "$out/libcrypto.so"; then
+    # 缓存可复用条件：必需符号齐全 + 不引用新 API 符号 + stamp 记录的 API 与本轮一致。
+    # 只能信任“本轮真正编译出来”的产物：历史上 job 失败时 cache 也保存过残缺 so，
+    # 那种产物缺 EVP_CIPHER_CTX_reset 等符号，必须强制重编。
+    if [ -f "$stamp" ] && [ "$(cat "$stamp")" = "$api" ] && libcrypto_ok "$out/libcrypto.so"; then
         echo "[$abi] 使用缓存的构建结果：$out/libcrypto.so"
     else
         echo "[$abi] 以 API $api 重新编译 OpenSSL $OPENSSL_VERSION ..."
+        [ -e "$stamp" ] && echo "[$abi] 缓存产物不完整或 API 不匹配，丢弃后重建"
+        # 清掉可能被污染的旧产物，避免残留文件进入下一轮 cache
+        rm -rf "$out"
         fetch_tarball
         # 快速失败：确认该 API 的 clang wrapper 在 NDK 里存在
         [ -x "$TOOLCHAIN/bin/${triple}${api}-clang" ] \
@@ -128,13 +170,15 @@ build_abi() {
         cp -a "$src/libcrypto.so" "$out/libcrypto.so"
         # opensslconf.h 等由 Configure 按 ABI 生成在源码树里，必须按 ABI 分别安装
         cp -a "$src/include/openssl" "$out/include/openssl"
+        echo "$api" > "$stamp"
     fi
 
     if ! libcrypto_ok "$out/libcrypto.so"; then
-        echo "[$abi] 构建结果仍引用了新 API 符号：" >&2
+        echo "[$abi] 构建结果校验失败：" >&2
         "$NM" -D "$out/libcrypto.so" | awk '$(NF-1) == "U" { sub(/@.*/, "", $NF); print $NF }' \
-            | grep -E "$NEW_API_SYMBOLS" >&2 || true
-        die "[$abi] libcrypto.so 仍无法在老设备上加载，请检查 Configure 是否按 API $api 编译"
+            | grep -E "$NEW_API_SYMBOLS" | sed 's/^/  引用了新 API 符号: /' >&2 || true
+        check_required_syms "$out/libcrypto.so" || true
+        die "[$abi] libcrypto.so 无法在老设备上加载，请检查 Configure 是否按 API $api 编译"
     fi
 
     echo "[$abi] NEEDED: $("$READELF" -d "$out/libcrypto.so" | grep NEEDED | sed 's/.*\[\(.*\)\].*/\1/' | tr '\n' ' ')"

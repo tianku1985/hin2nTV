@@ -71,10 +71,12 @@ jobs:
       # 导致 edge_v2/edge_v3/edge_jni 抛 UnsatisfiedLinkError。
       # 这里用 minSdk 对应的 API（32 位 19 / 64 位 21）重建后覆盖 jniLibs。
       - name: Cache OpenSSL build
+        # 只在成功后的 post 步骤保存：早期版本 job 失败时也保存了残缺/半成品 libcrypto.so，
+        # 被后续运行当作“可用缓存”复用，导致 APK 里的 libcrypto 缺符号、老设备 dlopen 失败。
         uses: actions/cache@v4
         with:
           path: hin2n/.openssl-build/out
-          key: openssl-1.1.1w-api19-21-ndk25.2-${{ runner.os }}-v2
+          key: openssl-1.1.1w-api19-21-ndk25.2-${{ runner.os }}-v3
 
       - name: Rebuild libcrypto.so with low Android API
         run: |
@@ -112,14 +114,22 @@ jobs:
           cp "$APK" "hin2n_apk/hin2n_${{ steps.tag.outputs.name }}.apk"
           # 固定名副本（供 tvbox 内置 json 的 hin2n.apkUrl 永远指向此文件）
           cp -f "hin2n_apk/hin2n_${{ steps.tag.outputs.name }}.apk" hin2n_apk/hin2n-latest.apk
-          # 端到端兜底：确认打进 APK 的 libcrypto.so 已是低 API 版本
-          #（不再引用 getentropy/__register_atfork 等新系统符号，否则老设备仍会 dlopen 失败）
+          # 端到端兜底：确认打进 APK 的 libcrypto.so 已是低 API 且符号齐全的版本
+          #（不引用 getentropy/__register_atfork 等新系统符号，且导出 n2n 引用的核心符号，
+          #  否则老设备仍会因 dlopen 失败报 UnsatisfiedLinkError）
           NM="${ANDROID_SDK_ROOT:-$ANDROID_HOME}/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
           unzip -p "$APK" lib/armeabi-v7a/libcrypto.so > /tmp/libcrypto-check.so
-          BAD="$("$NM" -D /tmp/libcrypto-check.so | awk '$(NF-1)=="U"{sub(/@.*/,"",$NF);print $NF}' | grep -E '^(getentropy|getrandom|__register_atfork)$' || true)"
+          DEF="$("$NM" -D /tmp/libcrypto-check.so | awk '{sub(/@.*/,"",$NF);print $NF}')"
+          BAD="$(printf '%s\n' "$DEF" | grep -E '^(getentropy|getrandom|__register_atfork)$' || true)"
           if [ -n "$BAD" ]; then
-            echo "APK 内 armeabi-v7a/libcrypto.so 仍是高 API 版本，引用了：$BAD"
-            exit 1
+            echo "APK 内 armeabi-v7a/libcrypto.so 仍是高 API 版本，引用了：$BAD"; exit 1
+          fi
+          MISS=""
+          for s in EVP_CIPHER_CTX_reset EVP_CIPHER_CTX_new EVP_aes_256_cbc EVP_EncryptInit_ex EVP_CipherUpdate; do
+            printf '%s\n' "$DEF" | grep -qx "$s" || MISS="$MISS $s"
+          done
+          if [ -n "$MISS" ]; then
+            echo "APK 内 armeabi-v7a/libcrypto.so 缺少必需导出符号：$MISS"; exit 1
           fi
           echo "APK 内 armeabi-v7a/libcrypto.so 符号校验通过（可用于老设备）"
 
