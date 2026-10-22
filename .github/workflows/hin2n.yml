@@ -86,7 +86,7 @@ jobs:
           # 在不同 Android 版本上分别缺失，是老设备 dlopen 失败的主因）。
           bash hin2n/scripts/build-openssl-android.sh
 
-      - uses: gradle/actions/setup-gradle@v6.2.0
+      - uses: gradle/actions/setup-gradle@v6.4.0
 
       - name: Build hin2n with Gradle
         # Gradle 工程根是 hin2n/Hin2n_android（settings.gradle 只 include ':app'）
