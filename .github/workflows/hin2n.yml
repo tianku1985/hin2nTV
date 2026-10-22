@@ -73,7 +73,7 @@ jobs:
       - name: Cache OpenSSL build
         # 只在成功后的 post 步骤保存：早期版本 job 失败时也保存了残缺/半成品 libcrypto.so，
         # 被后续运行当作“可用缓存”复用，导致 APK 里的 libcrypto 缺符号、老设备 dlopen 失败。
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: hin2n/.openssl-build/out
           key: openssl-1.1.1w-api19-21-ndk25.2-${{ runner.os }}-v4
