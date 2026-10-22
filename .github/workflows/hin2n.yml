@@ -76,12 +76,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: hin2n/.openssl-build/out
-          key: openssl-1.1.1w-api19-21-ndk25.2-${{ runner.os }}-v3
+          key: openssl-1.1.1w-api19-21-ndk25.2-${{ runner.os }}-v4
 
       - name: Rebuild libcrypto.so with low Android API
         run: |
           # 脚本内部优先选择 $ANDROID_SDK_ROOT/ndk/25.2.9519653（上方 sdkmanager 已安装），
-          # 忽略 runner 镜像预装的最新版 NDK（其默认 API 为 35，产物在老设备上无法加载）
+          # 忽略 runner 镜像预装的最新版 NDK（其默认 API 为 35，产物在老设备上无法加载）。
+          # 脚本还会去掉 OpenSSL 的 pthread_atfork 调用（__register_atfork / pthread_atfork
+          # 在不同 Android 版本上分别缺失，是老设备 dlopen 失败的主因）。
           bash hin2n/scripts/build-openssl-android.sh
 
       - uses: gradle/actions/setup-gradle@v6.2.0
@@ -114,24 +116,32 @@ jobs:
           cp "$APK" "hin2n_apk/hin2n_${{ steps.tag.outputs.name }}.apk"
           # 固定名副本（供 tvbox 内置 json 的 hin2n.apkUrl 永远指向此文件）
           cp -f "hin2n_apk/hin2n_${{ steps.tag.outputs.name }}.apk" hin2n_apk/hin2n-latest.apk
-          # 端到端兜底：确认打进 APK 的 libcrypto.so 已是低 API 且符号齐全的版本
-          #（不引用 getentropy/__register_atfork 等新系统符号，且导出 n2n 引用的核心符号，
-          #  否则老设备仍会因 dlopen 失败报 UnsatisfiedLinkError）
-          NM="${ANDROID_SDK_ROOT:-$ANDROID_HOME}/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
-          unzip -p "$APK" lib/armeabi-v7a/libcrypto.so > /tmp/libcrypto-check.so
-          DEF="$("$NM" -D /tmp/libcrypto-check.so | awk '{sub(/@.*/,"",$NF);print $NF}')"
-          BAD="$(printf '%s\n' "$DEF" | grep -E '^(getentropy|getrandom|__register_atfork)$' || true)"
-          if [ -n "$BAD" ]; then
-            echo "APK 内 armeabi-v7a/libcrypto.so 仍是高 API 版本，引用了：$BAD"; exit 1
-          fi
-          MISS=""
-          for s in EVP_CIPHER_CTX_reset EVP_CIPHER_CTX_new EVP_aes_256_cbc EVP_EncryptInit_ex EVP_CipherUpdate; do
-            printf '%s\n' "$DEF" | grep -qx "$s" || MISS="$MISS $s"
+          # 端到端兜底：确认打进 APK 的 libcrypto.so 已是低 API 且符号齐全的版本，
+          # 且 APK 内所有 native 库都没有引用老系统 libc 里不存在的符号
+          #（否则老设备仍会因 dlopen 失败报 UnsatisfiedLinkError）
+          NDK_BIN="${ANDROID_SDK_ROOT:-$ANDROID_HOME}/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          rm -rf /tmp/apklibs && mkdir -p /tmp/apklibs
+          for ABI in armeabi-v7a arm64-v8a x86 x86_64; do
+            unzip -p "$APK" "lib/$ABI/libcrypto.so" > "/tmp/apklibs/$ABI-libcrypto.so" || true
+            if [ ! -s "/tmp/apklibs/$ABI-libcrypto.so" ]; then
+              echo "APK 内缺少 lib/$ABI/libcrypto.so"; exit 1
+            fi
+            bash hin2n/scripts/check-libcrypto.sh "/tmp/apklibs/$ABI-libcrypto.so" \
+              "$NDK_BIN/llvm-nm" "$NDK_BIN/llvm-readelf" \
+              || { echo "APK 内 $ABI/libcrypto.so 校验失败"; exit 1; }
           done
-          if [ -n "$MISS" ]; then
-            echo "APK 内 armeabi-v7a/libcrypto.so 缺少必需导出符号：$MISS"; exit 1
-          fi
-          echo "APK 内 armeabi-v7a/libcrypto.so 符号校验通过（可用于老设备）"
+          # 使用 OpenSSL 的库只检查“危险未定义符号”（它们不提供 EVP_* 等导出符号）
+          for ABI in armeabi-v7a arm64-v8a x86 x86_64; do
+            for LIB in edge_v2 edge_v3 edge_jni; do
+              unzip -p "$APK" "lib/$ABI/$LIB.so" > "/tmp/apklibs/$ABI-$LIB.so" || true
+              if [ -s "/tmp/apklibs/$ABI-$LIB.so" ]; then
+                CHECK_MODE=undef bash hin2n/scripts/check-libcrypto.sh "/tmp/apklibs/$ABI-$LIB.so" \
+                  "$NDK_BIN/llvm-nm" "$NDK_BIN/llvm-readelf" \
+                  || { echo "APK 内 $ABI/$LIB.so 校验失败"; exit 1; }
+              fi
+            done
+          done
+          echo "APK 内 native 库符号校验通过（可用于老设备）"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v7
