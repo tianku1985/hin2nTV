@@ -1,0 +1,643 @@
+﻿{
+    "sites":  [
+                  {
+                      "name":  "ABC News",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_abc",
+                      "filterable":  0,
+                      "api":  "./py_spider/abc.py"
+                  },
+                  {
+                      "name":  "AcFun",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_acfun",
+                      "filterable":  0,
+                      "api":  "./py_spider/acfun.py"
+                  },
+                  {
+                      "name":  "梨视频",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_artetv",
+                      "filterable":  0,
+                      "api":  "./py_spider/artetv.py"
+                  },
+                  {
+                      "name":  "百度贴吧",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_baidutieba",
+                      "filterable":  0,
+                      "api":  "./py_spider/baidutieba.py"
+                  },
+                  {
+                      "name":  "Beacon",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_beacon",
+                      "filterable":  0,
+                      "api":  "./py_spider/beacon.py"
+                  },
+                  {
+                      "name":  "Bilibili",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_bilibili",
+                      "filterable":  0,
+                      "api":  "./py_spider/bilibili.py"
+                  },
+                  {
+                      "name":  "56网",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_c56",
+                      "filterable":  0,
+                      "api":  "./py_spider/c56.py"
+                  },
+                  {
+                      "name":  "CCC",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_ccc",
+                      "filterable":  0,
+                      "api":  "./py_spider/ccc.py"
+                  },
+                  {
+                      "name":  "CCtalk",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_cctalk",
+                      "filterable":  0,
+                      "api":  "./py_spider/cctalk.py"
+                  },
+                  {
+                      "name":  "CCTV",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_cctv",
+                      "filterable":  0,
+                      "api":  "./py_spider/cctv.py"
+                  },
+                  {
+                      "name":  "央视新闻",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_cctvnews",
+                      "filterable":  0,
+                      "api":  "./py_spider/cctvnews.py"
+                  },
+                  {
+                      "name":  "中国日报",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_chinadaily",
+                      "filterable":  0,
+                      "api":  "./py_spider/chinadaily.py"
+                  },
+                  {
+                      "name":  "Dailymotion",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_dailymotion",
+                      "filterable":  0,
+                      "api":  "./py_spider/dailymotion.py"
+                  },
+                  {
+                      "name":  "懂车帝",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_dongchedi",
+                      "filterable":  0,
+                      "api":  "./py_spider/dongchedi.py"
+                  },
+                  {
+                      "name":  "抖音",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_douyin",
+                      "filterable":  0,
+                      "api":  "./py_spider/douyin.py"
+                  },
+                  {
+                      "name":  "独角兽",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_duxiaoshi",
+                      "filterable":  0,
+                      "api":  "./py_spider/duxiaoshi.py"
+                  },
+                  {
+                      "name":  "Eyepetizer",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_eyepetizer",
+                      "filterable":  0,
+                      "api":  "./py_spider/eyepetizer.py"
+                  },
+                  {
+                      "name":  "FOX新闻",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_foxnews",
+                      "filterable":  0,
+                      "api":  "./py_spider/foxnews.py"
+                  },
+                  {
+                      "name":  "Genius",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_genius",
+                      "filterable":  0,
+                      "api":  "./py_spider/genius.py"
+                  },
+                  {
+                      "name":  "好看视频",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_haokan",
+                      "filterable":  0,
+                      "api":  "./py_spider/haokan.py"
+                  },
+                  {
+                      "name":  "环球网",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_huanqiu",
+                      "filterable":  0,
+                      "api":  "./py_spider/huanqiu.py"
+                  },
+                  {
+                      "name":  "虎牙直播",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_huya",
+                      "filterable":  0,
+                      "api":  "./py_spider/huya.py"
+                  },
+                  {
+                      "name":  "爱奇艺",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_iqiyi",
+                      "filterable":  0,
+                      "api":  "./py_spider/iqiyi.py"
+                  },
+                  {
+                      "name":  "爱奇艺电影",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_iyf",
+                      "filterable":  0,
+                      "api":  "./py_spider/iyf.py"
+                  },
+                  {
+                      "name":  "Kakao",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_kakao",
+                      "filterable":  0,
+                      "api":  "./py_spider/kakao.py"
+                  },
+                  {
+                      "name":  "看看新闻",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_kankannews",
+                      "filterable":  0,
+                      "api":  "./py_spider/kankannews.py"
+                  },
+                  {
+                      "name":  "酷6网",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_ku6",
+                      "filterable":  0,
+                      "api":  "./py_spider/ku6.py"
+                  },
+                  {
+                      "name":  "快手",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_kuaishou",
+                      "filterable":  0,
+                      "api":  "./py_spider/kuaishou.py"
+                  },
+                  {
+                      "name":  "酷狗音乐",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_kugoumv",
+                      "filterable":  0,
+                      "api":  "./py_spider/kugoumv.py"
+                  },
+                  {
+                      "name":  "乐视",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_leshi",
+                      "filterable":  0,
+                      "api":  "./py_spider/leshi.py"
+                  },
+                  {
+                      "name":  "1905电影网",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_m1905",
+                      "filterable":  0,
+                      "api":  "./py_spider/m1905.py"
+                  },
+                  {
+                      "name":  "美拍",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_meipai",
+                      "filterable":  0,
+                      "api":  "./py_spider/meipai.py"
+                  },
+                  {
+                      "name":  "芒果TV",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_mgtv",
+                      "filterable":  0,
+                      "api":  "./py_spider/mgtv.py"
+                  },
+                  {
+                      "name":  "明报",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_mingpao",
+                      "filterable":  0,
+                      "api":  "./py_spider/mingpao.py"
+                  },
+                  {
+                      "name":  "MyVideo",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_myvideoge",
+                      "filterable":  0,
+                      "api":  "./py_spider/myvideoge.py"
+                  },
+                  {
+                      "name":  "NewsPicks",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_newspicks",
+                      "filterable":  0,
+                      "api":  "./py_spider/newspicks.py"
+                  },
+                  {
+                      "name":  "Nuvid",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_nuvid",
+                      "filterable":  0,
+                      "api":  "./py_spider/nuvid.py"
+                  },
+                  {
+                      "name":  "Oasis",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_oasis",
+                      "filterable":  0,
+                      "api":  "./py_spider/oasis.py"
+                  },
+                  {
+                      "name":  "网易",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_open163",
+                      "filterable":  0,
+                      "api":  "./py_spider/open163.py"
+                  },
+                  {
+                      "name":  "东方日报",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_orientaldaily",
+                      "filterable":  0,
+                      "api":  "./py_spider/orientaldaily.py"
+                  },
+                  {
+                      "name":  "梨视频",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_pear",
+                      "filterable":  0,
+                      "api":  "./py_spider/pear.py"
+                  },
+                  {
+                      "name":  "人民网",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_people",
+                      "filterable":  0,
+                      "api":  "./py_spider/people.py"
+                  },
+                  {
+                      "name":  "皮皮虾",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_pipigaoxiao",
+                      "filterable":  0,
+                      "api":  "./py_spider/pipigaoxiao.py"
+                  },
+                  {
+                      "name":  "PIPIX",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_pipix",
+                      "filterable":  0,
+                      "api":  "./py_spider/pipix.py"
+                  },
+                  {
+                      "name":  "Player.pl",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_playerpl",
+                      "filterable":  0,
+                      "api":  "./py_spider/playerpl.py"
+                  },
+                  {
+                      "name":  "Reddit",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_reddit",
+                      "filterable":  0,
+                      "api":  "./py_spider/reddit.py"
+                  },
+                  {
+                      "name":  "小红书",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_rednote",
+                      "filterable":  0,
+                      "api":  "./py_spider/rednote.py"
+                  },
+                  {
+                      "name":  "Rutube",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_rutube",
+                      "filterable":  0,
+                      "api":  "./py_spider/rutube.py"
+                  },
+                  {
+                      "name":  "新浪",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_sina",
+                      "filterable":  0,
+                      "api":  "./py_spider/sina.py"
+                  },
+                  {
+                      "name":  "六间房",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_sixroom",
+                      "filterable":  0,
+                      "api":  "./py_spider/sixroom.py"
+                  },
+                  {
+                      "name":  "搜狐视频",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_sohu",
+                      "filterable":  0,
+                      "api":  "./py_spider/sohu.py"
+                  },
+                  {
+                      "name":  "TBN UK",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_tbnuk",
+                      "filterable":  0,
+                      "api":  "./py_spider/tbnuk.py"
+                  },
+                  {
+                      "name":  "TED",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_ted",
+                      "filterable":  0,
+                      "api":  "./py_spider/ted.py"
+                  },
+                  {
+                      "name":  "腾讯视频",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_tencent",
+                      "filterable":  0,
+                      "api":  "./py_spider/tencent.py"
+                  },
+                  {
+                      "name":  "Unity",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_unity",
+                      "filterable":  0,
+                      "api":  "./py_spider/unity.py"
+                  },
+                  {
+                      "name":  "微博",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_weibo",
+                      "filterable":  0,
+                      "api":  "./py_spider/weibo.py"
+                  },
+                  {
+                      "name":  "微视",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_weishi",
+                      "filterable":  0,
+                      "api":  "./py_spider/weishi.py"
+                  },
+                  {
+                      "name":  "全民K歌",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_wesing",
+                      "filterable":  0,
+                      "api":  "./py_spider/wesing.py"
+                  },
+                  {
+                      "name":  "WittyTV",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_wittytv",
+                      "filterable":  0,
+                      "api":  "./py_spider/wittytv.py"
+                  },
+                  {
+                      "name":  "WWE",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_wwe",
+                      "filterable":  0,
+                      "api":  "./py_spider/wwe.py"
+                  },
+                  {
+                      "name":  "网易视频",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_www163",
+                      "filterable":  0,
+                      "api":  "./py_spider/www163.py"
+                  },
+                  {
+                      "name":  "西瓜视频",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_xigua",
+                      "filterable":  0,
+                      "api":  "./py_spider/xigua.py"
+                  },
+                  {
+                      "name":  "新华网",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_xinhuanet",
+                      "filterable":  0,
+                      "api":  "./py_spider/xinhuanet.py"
+                  },
+                  {
+                      "name":  "新片场",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_xinpianchang",
+                      "filterable":  0,
+                      "api":  "./py_spider/xinpianchang.py"
+                  },
+                  {
+                      "name":  "XMFlv",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_xmflv",
+                      "filterable":  0,
+                      "api":  "./py_spider/xmflv.py"
+                  },
+                  {
+                      "name":  "学习强国",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_xuexicn",
+                      "filterable":  0,
+                      "api":  "./py_spider/xuexicn.py"
+                  },
+                  {
+                      "name":  "音悦台",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_yinyuetai",
+                      "filterable":  0,
+                      "api":  "./py_spider/yinyuetai.py"
+                  },
+                  {
+                      "name":  "优酷",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_youku",
+                      "filterable":  0,
+                      "api":  "./py_spider/youku.py"
+                  },
+                  {
+                      "name":  "YouTube",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_youtube",
+                      "filterable":  0,
+                      "api":  "./py_spider/youtube.py"
+                  },
+                  {
+                      "name":  "知乎",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_zhihu",
+                      "filterable":  0,
+                      "api":  "./py_spider/zhihu.py"
+                  },
+                  {
+                      "name":  "最右",
+                      "quickSearch":  1,
+                      "searchable":  1,
+                      "type":  3,
+                      "key":  "py_zuiyou",
+                      "filterable":  0,
+                      "api":  "./py_spider/zuiyou.py"
+                  }
+              ]
+}

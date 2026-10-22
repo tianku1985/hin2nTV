@@ -1,0 +1,46 @@
+这些 py_spider/ 里的文件是 TVBox 的 Python 爬虫，需要配合 支持 Python 爬虫的 TVBox 版本（如 FongMi、影视仓、takagen99 等）才能用。
+
+1. 准备文件
+把整个 py_spider/ 文件夹复制到你的设备上，建议放在一个固定目录，例如：
+
+/sdcard/TVBox/py_spider/
+或
+/storage/emulated/0/TVBox/py_spider/
+确保里面至少包含：
+
+spider_base.py （必需，共享基类）
+你要用的 *.py （如 haokan.py, bilibili.py）
+__init__.py
+2. 添加到 TVBox 配置
+编辑你的 TVBox 配置 JSON，在 sites 数组里添加站点。项目里已经生成了示例配置：py_spider/tvbox_sites_sample.json，你可以直接参考或合并里面的内容。
+
+最简单的单个站点示例：
+
+{
+  "key": "py_haokan",
+  "name": "好看视频",
+  "type": 3,
+  "api": "file:///storage/emulated/0/TVBox/py_spider/haokan.py",
+  "searchable": 1,
+  "quickSearch": 1,
+  "filterable": 0
+}
+api 路径说明
+TVBox 变体	常用路径格式	说明
+FongMi / 影视仓	file:///.../py_spider/xxx.py 或 ./py_spider/xxx.py	最常用，取决于配置文件的位置
+takagen99	clan://localhost/TVBox/py_spider/xxx.py	如果用 clan:// 本地配置才用这个
+其他版本	根据实际文件访问方式调整	以能正常加载为准
+注意：spider_base.py 必须和对应的 .py 在同一个文件夹里，否则会报 ModuleNotFoundError: spider_base。
+
+3. 使用方式
+将配置更新到 TVBox（本地配置文件或订阅链接）
+打开 TVBox，刷新配置
+在首页源列表里就会出现你添加的站点（名称就是 getName() 返回的值）
+直接用它解析视频链接，或者把视频页 URL 放到搜索里去解析
+使用提示
+大多数是链接解析型：这批蜘蛛大多是 "URL -> 直链" 型的解析器，首页/分类/搜索很多都返回空列表是正常的。最常用的用法是把视频分享链接粘贴到搜索框去解析。
+直接可用性不一：有些站点能直接拿到 m3u8/mp4（如 haokan、bilibili 部分场景），有些会走 parse: 1（交给 TVBox 内置解析器去嗅探）。
+受限平台：tencent（需 Node）、cctv（wasm）、youtube（botguard）、playerpl/wittytv（Widevine DRM）、用 DrissionPage 的站点（dongchedi、kuaishou 部分路径、xinpianchang）在移动端 Chaquopy 环境基本无法直接用，代码里已做了降级处理并注释了限制。
+先小范围测试：建议先用 haokan.py、bilibili.py 这类最常用的测试能不能加载、能不能解析成功。
+核心思路就是：把 py_spider/ 放到设备、在配置的 sites 里用 type: 3 指向 .py 文件即可。
+

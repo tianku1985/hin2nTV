@@ -158,10 +158,25 @@ build_abi() {
             # 清掉配置可能自带的高 API --target / __ANDROID_API__（后出现者优先，防止覆盖 wrapper 的低 API）
             sed -i -E "s|--target=[A-Za-z0-9_.-]+|--target=${triple}${api}|g" Makefile
             sed -i -E "s|-D__ANDROID_API__=[0-9]+|-D__ANDROID_API__=${api}|g" Makefile
+            # 移除版本脚本限制，确保所有符号（包括 EVP_CIPHER_CTX_* 等）都能导出到 libcrypto.so
+            sed -i -E 's/-Wl,--version-script[^ ]*//g' Makefile
+            sed -i -E 's/--version-script[^ ]*//g' Makefile
+            sed -i -E "s/libcrypto\.map//g" Makefile
+            sed -i -E "s/libssl\.map//g" Makefile
+            sed -i -E 's/SHLIB_MAPFILE.*$//g' Makefile
+            sed -i -E 's/^SHLIB_EX_OBJ[[:space:]]*=.*/SHLIB_EX_OBJ = /' Makefile 2>/dev/null || true
 
             echo "[$abi] Makefile 编译器: $(grep -E '^CC[[:space:]]*=' Makefile | head -n1)"
             grep -qE "^CC[[:space:]]*=.*${triple}${api}-clang" Makefile \
                 || die "[$abi] Makefile CC 未指向 ${triple}${api}-clang，无法保证产物可在 API $api 设备加载"
+            # 清空版本脚本，避免隐藏符号
+            rm -f libcrypto.map libssl.map
+            # 使用全量导出版本脚本
+            printf 'LIBCRYPTO_1.1 {\n    global: *;\n};\n' > libcrypto.map
+            printf 'LIBSSL_1.1 {\n    global: *;\n};\n' > libssl.map
+            # 再次强制从所有 Makefile 中移除 version-script
+            find . -name 'Makefile*' -type f -exec sed -i -E 's/-Wl,--version-script[^ ]*//g' {} \;
+            find . -name 'Makefile*' -type f -exec sed -i -E 's/--version-script[^ ]*//g' {} \;
 
             make -j"$JOBS" SHLIB_VERSION_NUMBER= SHLIB_EXT=.so build_libs
         )

@@ -1,0 +1,355 @@
+# -*- coding: utf-8 -*-
+# Ported from videodl (PolyForm Noncommercial License 1.0.0)
+from http.cookiejar import CookieJar
+from urllib.request import HTTPCookieProcessor
+from urllib.request import Request
+from urllib.request import build_opener
+from urllib.parse import urlencode
+import json
+import re
+from html import unescape
+from urllib.parse import urlparse, urljoin
+
+def safe_extract(d, keys, default=None):
+    cur = d
+    for k in keys:
+        if isinstance(cur, dict):
+            cur = cur.get(k)
+        elif isinstance(cur, list) and isinstance(k, int):
+            try:
+                cur = cur[k]
+            except Exception:
+                return default
+        else:
+            return default
+        if cur is None:
+            return default
+    return cur
+
+class Spider:
+    # ---------- inlined TVBox base helpers (self-contained, no sibling imports) ----------
+    def __init__(self):
+        self.extend = ''
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        }
+        self.cookie_jar = CookieJar()
+        self.opener = build_opener(HTTPCookieProcessor(self.cookie_jar))
+
+    def get(self, url, headers=None, timeout=10):
+        req_headers = dict(self.headers)
+        if headers:
+            req_headers.update(headers)
+        req = Request(url, headers=req_headers)
+        resp = self.opener.open(req, timeout=timeout)
+        content = resp.read()
+        for enc in ('utf-8', 'gbk', 'latin-1'):
+            try:
+                return content.decode(enc)
+            except Exception:
+                continue
+        return ''
+
+    def post(self, url, data=None, headers=None, timeout=10):
+        req_headers = dict(self.headers)
+        if headers:
+            req_headers.update(headers)
+        if isinstance(data, dict):
+            data = urlencode(data).encode('utf-8')
+            req_headers.setdefault('Content-Type', 'application/x-www-form-urlencoded')
+        elif isinstance(data, str):
+            data = data.encode('utf-8')
+        req = Request(url, data=data, headers=req_headers)
+        resp = self.opener.open(req, timeout=timeout)
+        content = resp.read()
+        for enc in ('utf-8', 'gbk', 'latin-1'):
+            try:
+                return content.decode(enc)
+            except Exception:
+                continue
+        return ''
+
+    def fetch_json(self, url, headers=None, timeout=10):
+        return json.loads(self.get(url, headers=headers, timeout=timeout))
+
+    def legalize(self, s):
+        if not s:
+            return ''
+        s = re.sub(r'[\\/:*?"<>|]', '', str(s))
+        return re.sub(r'\s+', ' ', s).strip()
+
+    def match_domain(self, url, domains):
+        try:
+            host = urlparse(url).netloc.lower()
+            for d in domains:
+                if host == d or host.endswith('.' + d):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def build_vod(self, vod_id, name, pic='', remarks='', content='', play_from='', play_url=''):
+        return {
+            'vod_id': vod_id,
+            'vod_name': name,
+            'vod_pic': pic,
+            'vod_remarks': remarks,
+            'vod_content': content,
+            'vod_play_from': play_from,
+            'vod_play_url': play_url
+        }
+
+    # ---------- standard TVBox spider interface defaults ----------
+    def getDependence(self):
+        return []
+
+    def homeVideoContent(self):
+        return {"list": []}
+
+    def liveContent(self, url):
+        return ""
+
+    def localProxy(self, param):
+        return None
+
+    def isVideoFormat(self, url):
+        return True
+
+    def manualVideoCheck(self):
+        return False
+
+    def action(self, action):
+        return {}
+
+    def destroy(self):
+        pass
+
+    VIDEO_EXT = re.compile(r"\.(mp4|m3u8|mpd|webm)(\?|$)", re.I)
+    BAD_HOST = ("googlesyndication.com", "doubleclick.net", "googletagmanager.com", "adpushup.com")
+    DOMAINS = ["orientaldaily.com.my", "odn.my"]
+    
+    def getName(self):
+        return "东方日报"
+    
+    def init(self, extend=""):
+        self.extend = extend
+    
+    def homeContent(self, filter):
+        return {"class": [], "list": []}
+    
+    def categoryContent(self, tid, pg, filter, extend):
+        return {"page": pg, "pagecount": 1, "limit": 20, "total": 0, "list": []}
+    
+    def detailContent(self, ids):
+        result = {"list": []}
+        try:
+            url = ids[0] if isinstance(ids, list) else ids
+            url = str(url or '').strip()
+            if not self.match_domain(url, self.DOMAINS):
+                return result
+            html_text = self.get(url, timeout=10)
+            info = self._extract(html_text, url)
+            title = self._clean_title(info.get('title') or '') or '东方日报视频'
+            cover = info.get('cover_url') or ''
+            direct = info.get('videos') or []
+            media = direct[0] if direct else ''
+            play_id = '%s|%s' % (url, media)
+            result['list'] = [self.build_vod(url, title, cover, '', title, '东方日报', '%s$%s' % (title, play_id))]
+        except Exception:
+            pass
+        return result
+    
+    def searchContent(self, key, quick, pg="1"):
+        return {"page": pg, "pagecount": 1, "limit": 20, "total": 0, "list": []}
+    
+    def playerContent(self, flag, id, vipFlags):
+        try:
+            parts = str(id).split('|')
+            page = parts[0] if len(parts) > 0 else ''
+            media = parts[1] if len(parts) > 1 else ''
+            if media.startswith('http'):
+                header = {'Referer': page, 'User-Agent': self.headers['User-Agent']}
+                return {"parse": 0, "url": media, "header": json.dumps(header)}
+            if page:
+                header = {'Referer': page, 'User-Agent': self.headers['User-Agent']}
+                return {"parse": 1, "url": page, "header": json.dumps(header)}
+            return {"parse": 1, "url": id}
+        except Exception:
+            return {"parse": 1, "url": id}
+    
+    def _extract(self, html_text, page_url):
+        cover, direct, embeds = '', [], []
+        meta = self._meta(html_text, 'og:image:secure_url', 'og:image', 'twitter:image')
+        if meta:
+            cover = self._norm(meta, page_url)
+        if not cover:
+            vals = self._jsonldvalues(html_text, 'thumbnailUrl', 'image')
+            if vals:
+                cover = self._norm(vals[0], page_url)
+        for name in ('iframe', 'video', 'source'):
+            for tag in self._tags(html_text, name):
+                src = self._norm(self._attr(tag, 'src') or self._attr(tag, 'data-src'), page_url)
+                if not src or self._bad_url(src):
+                    continue
+                if self.VIDEO_EXT.search(src):
+                    direct.append(src)
+                else:
+                    embeds.append(src)
+                if not cover:
+                    poster = self._norm(self._attr(tag, 'poster'), page_url)
+                    if poster:
+                        cover = poster
+        for v in self._jsonldvalues(html_text, 'contentUrl', 'embedUrl', 'url'):
+            v = self._norm(v, page_url)
+            if not v or self._bad_url(v):
+                continue
+            if self.VIDEO_EXT.search(v):
+                direct.append(v)
+            else:
+                embeds.append(v)
+        for iframe in embeds:
+            if 'facebook.com/plugins/video' not in iframe:
+                continue
+            try:
+                text = self.get(iframe, headers={'Referer': page_url}, timeout=10)
+            except Exception:
+                continue
+            urls = []
+            for key in ('hd_src', 'sd_src', 'browser_native_hd_url', 'browser_native_sd_url', 'playable_url_quality_hd', 'playable_url'):
+                pattern = r'"%s"\s*:\s*"((?:\\.|[^"\\])*)"' % re.escape(key)
+                for m in re.finditer(pattern, text):
+                    urls.append(self._jsstring(m.group(1)))
+            if not urls:
+                for m in re.finditer(r"https?:\\?/\\?/[^\"'<> ]+?\.mp4[^\"'<> ]*", text):
+                    urls.append(self._jsstring(m.group(0)))
+            for u in urls:
+                if str(u).startswith('http') and not self._bad_url(u):
+                    direct.append(u)
+        direct = self._uniq(direct)
+        embeds = self._uniq(embeds)
+        title = self._clean_text(self._first(self._tag_text(html_text, 'h1'), self._meta(html_text, 'og:title', 'twitter:title'), self._title_text(html_text)))
+        if not title:
+            vals = self._jsonldvalues(html_text, 'headline', 'name')
+            title = self._clean_text(vals[0]) if vals else ''
+        return {"title": title, "cover_url": cover, "video_url": direct[0] if direct else (embeds[0] if embeds else ''), "videos": direct, "embeds": embeds}
+    
+    def _meta(self, html_text, *names):
+        for tag in re.findall(r'<meta\b[^>]*>', html_text, re.I):
+            for n in names:
+                if re.search(r'(?:property|name|itemprop)\s*=\s*["\']%s["\']' % re.escape(n), tag, re.I):
+                    content = self._attr(tag, 'content')
+                    if content:
+                        return content
+        return ''
+    
+    def _tags(self, html_text, name):
+        return re.findall(r'<%s\b[^>]*>' % name, html_text, re.I)
+    
+    def _attr(self, tag, name):
+        m = re.search(r'\b%s\s*=\s*["\']([^"\']*)["\']' % re.escape(name), tag, re.I)
+        if m:
+            return m.group(1)
+        m = re.search(r'\b%s\s*=\s*([^\s"\'>]+)' % re.escape(name), tag, re.I)
+        return m.group(1) if m else ''
+    
+    def _tag_text(self, html_text, name):
+        m = re.search(r'<%s\b[^>]*>(.*?)</%s>' % (name, name), html_text, re.I | re.S)
+        return self._clean_text(m.group(1)) if m else ''
+    
+    def _title_text(self, html_text):
+        m = re.search(r'<title\b[^>]*>(.*?)</title>', html_text, re.I | re.S)
+        return self._clean_text(m.group(1)) if m else ''
+    
+    def _jsonldvalues(self, html_text, *keys):
+        vals = []
+        pattern = r'<script[^>]*type\s*=\s*["\'][^"\']*ld\+json[^"\']*["\'][^>]*>(.*?)</script>'
+        for raw in re.findall(pattern, html_text, re.I | re.S):
+            data = self._loads(raw)
+            if not data:
+                continue
+            for obj in self._walkjson(data):
+                for k in keys:
+                    v = obj.get(k)
+                    if v:
+                        vals.append(v)
+        return vals
+    
+    def _walkjson(self, x):
+        if isinstance(x, dict):
+            yield x
+            for v in x.values():
+                for item in self._walkjson(v):
+                    yield item
+        elif isinstance(x, list):
+            for v in x:
+                for item in self._walkjson(v):
+                    yield item
+    
+    def _loads(self, text):
+        try:
+            return json.loads(text)
+        except Exception:
+            pass
+        try:
+            return json.loads(re.sub(r',\s*([\]}])', r'\1', text))
+        except Exception:
+            pass
+        try:
+            obj, _ = json.JSONDecoder().raw_decode(text.lstrip())
+            return obj
+        except Exception:
+            return {}
+    
+    def _norm(self, u, base):
+        u = self._clean_text(u)
+        if not u:
+            return ''
+        u = u.replace('\\/', '/')
+        try:
+            return urljoin(base, u)
+        except Exception:
+            return u
+    
+    def _bad_url(self, u):
+        try:
+            host = urlparse(str(u)).netloc.lower()
+        except Exception:
+            return True
+        if 'blank.mp4' in str(u):
+            return True
+        return any(x in host for x in self.BAD_HOST)
+    
+    def _uniq(self, xs):
+        seen, out = set(), []
+        for x in xs:
+            if x and x not in seen:
+                seen.add(x)
+                out.append(x)
+        return out
+    
+    def _first(self, *xs):
+        for x in xs:
+            if x and str(x).strip():
+                return x
+        return ''
+    
+    def _clean_text(self, s):
+        if s is None:
+            return ''
+        s = re.sub(r'<[^>]+>', ' ', str(s))
+        s = unescape(s)
+        return re.sub(r'\s+', ' ', s).strip()
+    
+    def _clean_title(self, s):
+        s = self._clean_text(s)
+        s = re.sub(r"\s*[|｜-]\s*(東方網|东方网|馬來西亞東方日報|马来西亚东方日报).*$", "", s)
+        s = re.sub(r"\s*[|｜-]\s*(视频|國內|国内|国际|財經|财经|社会|娱乐|生活|体育|评论|地方|专题)\s*$", "", s)
+        return s.strip()
+    
+    def _jsstring(self, s):
+        try:
+            return json.loads('"' + s + '"')
+        except Exception:
+            return unescape(str(s).replace('\\/', '/').replace('\\u0025', '%').replace('\\u0026', '&'))

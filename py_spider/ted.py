@@ -1,0 +1,303 @@
+# -*- coding: utf-8 -*-
+# Ported from videodl (PolyForm Noncommercial License 1.0.0)
+from http.cookiejar import CookieJar
+from urllib.request import HTTPCookieProcessor
+from urllib.request import Request
+from urllib.request import build_opener
+from urllib.parse import urlencode
+from html import unescape
+import json
+import re
+from urllib.parse import urlparse
+
+def safe_extract(d, keys, default=None):
+    cur = d
+    for k in keys:
+        if isinstance(cur, dict):
+            cur = cur.get(k)
+        elif isinstance(cur, list) and isinstance(k, int):
+            try:
+                cur = cur[k]
+            except Exception:
+                return default
+        else:
+            return default
+        if cur is None:
+            return default
+    return cur
+
+class Spider:
+    # ---------- inlined TVBox base helpers (self-contained, no sibling imports) ----------
+    def __init__(self):
+        self.extend = ''
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        }
+        self.cookie_jar = CookieJar()
+        self.opener = build_opener(HTTPCookieProcessor(self.cookie_jar))
+
+    def get(self, url, headers=None, timeout=10):
+        req_headers = dict(self.headers)
+        if headers:
+            req_headers.update(headers)
+        req = Request(url, headers=req_headers)
+        resp = self.opener.open(req, timeout=timeout)
+        content = resp.read()
+        for enc in ('utf-8', 'gbk', 'latin-1'):
+            try:
+                return content.decode(enc)
+            except Exception:
+                continue
+        return ''
+
+    def post(self, url, data=None, headers=None, timeout=10):
+        req_headers = dict(self.headers)
+        if headers:
+            req_headers.update(headers)
+        if isinstance(data, dict):
+            data = urlencode(data).encode('utf-8')
+            req_headers.setdefault('Content-Type', 'application/x-www-form-urlencoded')
+        elif isinstance(data, str):
+            data = data.encode('utf-8')
+        req = Request(url, data=data, headers=req_headers)
+        resp = self.opener.open(req, timeout=timeout)
+        content = resp.read()
+        for enc in ('utf-8', 'gbk', 'latin-1'):
+            try:
+                return content.decode(enc)
+            except Exception:
+                continue
+        return ''
+
+    def fetch_json(self, url, headers=None, timeout=10):
+        return json.loads(self.get(url, headers=headers, timeout=timeout))
+
+    def legalize(self, s):
+        if not s:
+            return ''
+        s = re.sub(r'[\\/:*?"<>|]', '', str(s))
+        return re.sub(r'\s+', ' ', s).strip()
+
+    def match_domain(self, url, domains):
+        try:
+            host = urlparse(url).netloc.lower()
+            for d in domains:
+                if host == d or host.endswith('.' + d):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def build_vod(self, vod_id, name, pic='', remarks='', content='', play_from='', play_url=''):
+        return {
+            'vod_id': vod_id,
+            'vod_name': name,
+            'vod_pic': pic,
+            'vod_remarks': remarks,
+            'vod_content': content,
+            'vod_play_from': play_from,
+            'vod_play_url': play_url
+        }
+
+    # ---------- standard TVBox spider interface defaults ----------
+    def getDependence(self):
+        return []
+
+    def homeVideoContent(self):
+        return {"list": []}
+
+    def liveContent(self, url):
+        return ""
+
+    def localProxy(self, param):
+        return None
+
+    def isVideoFormat(self, url):
+        return True
+
+    def manualVideoCheck(self):
+        return False
+
+    def action(self, action):
+        return {}
+
+    def destroy(self):
+        pass
+
+    DOMAINS = ["ted.com"]
+    UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+    DOWNLOAD_HEADERS = {
+        "Accept-Encoding": "identity;q=1, *;q=0",
+        "Referer": "https://www.ted.com/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    }
+
+    def getName(self):
+        return "TED"
+
+    def init(self, extend=""):
+        self.extend = extend
+        self.headers.update({'User-Agent': self.UA})
+
+    def homeContent(self, filter):
+        return {"class": [], "list": []}
+
+    def categoryContent(self, tid, pg, filter, extend):
+        return {"page": pg, "pagecount": 1, "limit": 20, "total": 0, "list": []}
+
+    def detailContent(self, ids):
+        result = {"list": []}
+        try:
+            url = ids[0] if isinstance(ids, list) else ids
+            url = str(url or '').strip()
+            if not self.match_domain(url, self.DOMAINS):
+                return result
+            vid = urlparse(url).path.strip('/').split('/')[-1]
+            if not vid:
+                return result
+            html = self.get(url, headers={'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'}, timeout=15)
+            raw_data = self._nextdata(html) or {}
+            video_data = safe_extract(raw_data, ['props', 'pageProps', 'videoData'], {}) or {}
+            player_data = self._playerdata(raw_data, video_data)
+            playurl = self._pickstream(player_data)
+            title = self._clean(safe_extract(video_data, ['title'], '') or self._meta(html, 'og:title') or vid)
+            cover = safe_extract(video_data, ['primaryImageSet', 0, 'url'], '') or self._meta(html, 'og:image')
+            if not cover:
+                cover = self._meta(html, 'og:image')
+            play_id = '%s||%s||%s' % (self._enc(playurl), self._enc(url), vid)
+            result['list'] = [self.build_vod(vid, title, cover, '', title, 'TED', '%s$%s' % (title, play_id))]
+        except Exception:
+            pass
+        return result
+
+    def searchContent(self, key, quick, pg="1"):
+        return {"page": pg, "pagecount": 1, "limit": 20, "total": 0, "list": []}
+
+    def playerContent(self, flag, id, vipFlags):
+        try:
+            parts = str(id).split('||')
+            playurl = self._dec(parts[0]) if parts else ''
+            page = self._dec(parts[1]) if len(parts) > 1 else ''
+            if not playurl.startswith('http') and page:
+                try:
+                    html = self.get(page, timeout=15)
+                    raw_data = self._nextdata(html) or {}
+                    video_data = safe_extract(raw_data, ['props', 'pageProps', 'videoData'], {}) or {}
+                    playurl = self._pickstream(self._playerdata(raw_data, video_data))
+                except Exception:
+                    pass
+            if playurl.startswith('http'):
+                header = dict(self.DOWNLOAD_HEADERS)
+                return {"parse": 0, "url": playurl, "header": json.dumps(header)}
+            if page:
+                return {"parse": 1, "url": page, "header": json.dumps({'User-Agent': self.UA, 'Referer': 'https://www.ted.com/'})}
+            return {"parse": 1, "url": id}
+        except Exception:
+            return {"parse": 1, "url": id}
+
+    def _loads(self, text):
+        if not text:
+            return None
+        try:
+            return json.loads(text)
+        except Exception:
+            pass
+        try:
+            fixed = re.sub(r',\s*([}\]])', r'\1', text)
+            fixed = fixed.replace('\\/', '/')
+            return json.loads(fixed)
+        except Exception:
+            pass
+        return None
+
+    def _nextdata(self, html):
+        try:
+            m = re.search(r'<script[^>]*id=["\']__NEXT_DATA__["\'][^>]*>(.*?)</script>', html or '', re.S | re.I)
+            if not m:
+                return None
+            return self._loads(m.group(1).strip())
+        except Exception:
+            return None
+
+    def _playerdata(self, raw_data, video_data):
+        player = safe_extract(video_data, ['playerData'], '') or ''
+        if isinstance(player, str):
+            player = self._loads(player) or {}
+        if isinstance(player, dict) and player:
+            return player
+        resources = self._findkey(raw_data, 'resources')
+        if isinstance(resources, dict) and resources:
+            return resources
+        return {}
+
+    def _findkey(self, obj, key):
+        try:
+            stack = [obj]
+            while stack:
+                cur = stack.pop(0)
+                if isinstance(cur, dict):
+                    if key in cur:
+                        return cur[key]
+                    stack.extend(list(cur.values()))
+                elif isinstance(cur, list):
+                    stack.extend(cur)
+        except Exception:
+            pass
+        return None
+
+    def _pickstream(self, player_data):
+        try:
+            if not isinstance(player_data, dict):
+                return ''
+            resources = player_data.get('resources')
+            if not isinstance(resources, dict):
+                resources = player_data
+            stream = safe_extract(resources, ['hls', 'stream'], '') or ''
+            if stream:
+                return stream
+            h264 = safe_extract(resources, ['h264'], []) or []
+            if isinstance(h264, list) and h264:
+                items = [x for x in h264 if isinstance(x, dict)]
+                items.sort(key=lambda x: x.get('bitrate', 0) or 0, reverse=True)
+                for item in items:
+                    f = item.get('file')
+                    if f:
+                        return f
+            rtmp = safe_extract(resources, ['rtmp'], []) or []
+            if isinstance(rtmp, list) and rtmp:
+                items = [x for x in rtmp if isinstance(x, dict)]
+                items.sort(key=lambda x: (x.get('width', 0) or 0) * (x.get('height', 0) or 0), reverse=True)
+                for item in items:
+                    f = item.get('file')
+                    if f:
+                        return f
+        except Exception:
+            pass
+        return ''
+
+    def _meta(self, html, prop):
+        try:
+            m = re.search(r'<meta[^>]+property=["\']%s["\'][^>]+content=["\']([^"\']*)["\']' % re.escape(prop), html or '', re.I)
+            if not m:
+                m = re.search(r'<meta[^>]+content=["\']([^"\']*)["\'][^>]+property=["\']%s["\']' % re.escape(prop), html or '', re.I)
+            return m.group(1) if m else ''
+        except Exception:
+            return ''
+
+    def _enc(self, s):
+        try:
+            return str(s or '').replace('|', '%7C').replace('$', '%24').replace('#', '%23')
+        except Exception:
+            return ''
+
+    def _dec(self, s):
+        try:
+            return str(s or '').replace('%7C', '|').replace('%24', '$').replace('%23', '#')
+        except Exception:
+            return ''
+
+    def _clean(self, s):
+        s = self.legalize(s or '')
+        return s.replace('$', '').replace('#', '').replace('|', '').strip()

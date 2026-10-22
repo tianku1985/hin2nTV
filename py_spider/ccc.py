@@ -1,0 +1,254 @@
+# -*- coding: utf-8 -*-
+# Ported from videodl (PolyForm Noncommercial License 1.0.0)
+from http.cookiejar import CookieJar
+from urllib.request import HTTPCookieProcessor
+from urllib.request import Request
+from urllib.request import build_opener
+from urllib.parse import urlencode
+from html import unescape
+import json
+import re
+from urllib.parse import urlparse, parse_qs
+
+def safe_extract(d, keys, default=None):
+    cur = d
+    for k in keys:
+        if isinstance(cur, dict):
+            cur = cur.get(k)
+        elif isinstance(cur, list) and isinstance(k, int):
+            try:
+                cur = cur[k]
+            except Exception:
+                return default
+        else:
+            return default
+        if cur is None:
+            return default
+    return cur
+
+class Spider:
+    # ---------- inlined TVBox base helpers (self-contained, no sibling imports) ----------
+    def __init__(self):
+        self.extend = ''
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        }
+        self.cookie_jar = CookieJar()
+        self.opener = build_opener(HTTPCookieProcessor(self.cookie_jar))
+
+    def get(self, url, headers=None, timeout=10):
+        req_headers = dict(self.headers)
+        if headers:
+            req_headers.update(headers)
+        req = Request(url, headers=req_headers)
+        resp = self.opener.open(req, timeout=timeout)
+        content = resp.read()
+        for enc in ('utf-8', 'gbk', 'latin-1'):
+            try:
+                return content.decode(enc)
+            except Exception:
+                continue
+        return ''
+
+    def post(self, url, data=None, headers=None, timeout=10):
+        req_headers = dict(self.headers)
+        if headers:
+            req_headers.update(headers)
+        if isinstance(data, dict):
+            data = urlencode(data).encode('utf-8')
+            req_headers.setdefault('Content-Type', 'application/x-www-form-urlencoded')
+        elif isinstance(data, str):
+            data = data.encode('utf-8')
+        req = Request(url, data=data, headers=req_headers)
+        resp = self.opener.open(req, timeout=timeout)
+        content = resp.read()
+        for enc in ('utf-8', 'gbk', 'latin-1'):
+            try:
+                return content.decode(enc)
+            except Exception:
+                continue
+        return ''
+
+    def fetch_json(self, url, headers=None, timeout=10):
+        return json.loads(self.get(url, headers=headers, timeout=timeout))
+
+    def legalize(self, s):
+        if not s:
+            return ''
+        s = re.sub(r'[\\/:*?"<>|]', '', str(s))
+        return re.sub(r'\s+', ' ', s).strip()
+
+    def match_domain(self, url, domains):
+        try:
+            host = urlparse(url).netloc.lower()
+            for d in domains:
+                if host == d or host.endswith('.' + d):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def build_vod(self, vod_id, name, pic='', remarks='', content='', play_from='', play_url=''):
+        return {
+            'vod_id': vod_id,
+            'vod_name': name,
+            'vod_pic': pic,
+            'vod_remarks': remarks,
+            'vod_content': content,
+            'vod_play_from': play_from,
+            'vod_play_url': play_url
+        }
+
+    # ---------- standard TVBox spider interface defaults ----------
+    def getDependence(self):
+        return []
+
+    def homeVideoContent(self):
+        return {"list": []}
+
+    def liveContent(self, url):
+        return ""
+
+    def localProxy(self, param):
+        return None
+
+    def isVideoFormat(self, url):
+        return True
+
+    def manualVideoCheck(self):
+        return False
+
+    def action(self, action):
+        return {}
+
+    def destroy(self):
+        pass
+
+    def getName(self):
+        return "CCC"
+    
+    def init(self, extend=""):
+        self.extend = extend
+        self.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36'
+        })
+    
+    def homeContent(self, filter):
+        return {"class": [], "list": []}
+    
+    def categoryContent(self, tid, pg, filter, extend):
+        return {"page": pg, "pagecount": 1, "limit": 20, "total": 0, "list": []}
+    
+    def detailContent(self, ids):
+        result = {"list": []}
+        try:
+            url = ids[0] if isinstance(ids, list) else ids
+            if not self.match_domain(url, ["media.ccc.de"]):
+                return result
+            m = re.compile(r'https?://(?:www\.)?media\.ccc\.de/c/([^/?#&]+)').match(url)
+            if m:
+                vods = self._parse_playlist(m.group(1), url)
+            else:
+                item = self._parse_single(url)
+                vods = []
+                if item:
+                    title = item.get('title') or 'CCC'
+                    play_id = f"{item.get('play', '')}|{url}"
+                    vods.append(self.build_vod(item.get('id') or url, title, item.get('cover') or '', '', title, 'CCC', f'{title}${play_id}'))
+            result['list'] = vods
+        except Exception:
+            pass
+        return result
+    
+    def searchContent(self, key, quick, pg="1"):
+        return {"page": pg, "pagecount": 1, "limit": 20, "total": 0, "list": []}
+    
+    def playerContent(self, flag, id, vipFlags):
+        try:
+            parts = id.split('|')
+            media = parts[0].strip()
+            page = parts[-1].strip()
+            if media.startswith('http'):
+                return {"parse": 0, "url": media, "header": json.dumps({'User-Agent': self.headers['User-Agent'], 'Referer': page})}
+            return {"parse": 1, "url": page or media}
+        except Exception:
+            return {"parse": 1, "url": id}
+    
+    def _parse_playlist(self, cid, page_url):
+        vods = []
+        try:
+            raw = self.fetch_json(f'https://media.ccc.de/public/conferences/{cid}')
+            events = raw.get('events', []) or []
+            for ev in events:
+                if not isinstance(ev, dict) or not ev.get('frontend_link'):
+                    continue
+                item = self._parse_single(ev['frontend_link'])
+                if not item:
+                    continue
+                title = f"EP{len(vods) + 1}-{item['title']}"
+                play_id = f"{item['play']}|{ev['frontend_link']}"
+                vods.append(self.build_vod(f'{cid}-{len(vods) + 1}', title, item['cover'], '', title, 'CCC', f'{title}${play_id}'))
+        except Exception:
+            pass
+        return vods
+    
+    def _parse_single(self, url):
+        try:
+            dm = re.search(r'https?://(?:www\.)?media\.ccc\.de/v/([^/?#&]+)', url)
+            display_id = dm.group(1) if dm else url
+            webpage = self.get(url)
+            download_url, title, cover = '', '', ''
+            em = re.search(r"\bdata-id\s*=\s*(['\"])(\d+)\1", webpage, flags=re.IGNORECASE)
+            if em:
+                try:
+                    raw = self.fetch_json(f'https://media.ccc.de/public/events/{em.group(2)}')
+                    videos = [r for r in (raw.get('recordings', []) or []) if isinstance(r, dict) and isinstance(r.get('mime_type'), str) and r['mime_type'].startswith('video/')]
+                    videos.sort(key=self._rec_quality, reverse=True)
+                    if videos:
+                        download_url = videos[0].get('recording_url') or ''
+                    title = raw.get('title') or ''
+                    cover = raw.get('poster_url') or raw.get('thumb_url') or ''
+                except Exception:
+                    pass
+            if not download_url:
+                found = re.findall(r'https?://cdn\.media\.ccc\.de/[^"\'<>\s]+?\.(?:mp4|webm|mkv|mov)(?:\?[^"\'<>\s]*)?', webpage, flags=re.IGNORECASE)
+                found = list(dict.fromkeys([u.replace('&amp;', '&') for u in found]))
+                found.sort(key=self._url_quality, reverse=True)
+                if found:
+                    download_url = found[0]
+            if not title:
+                hm = re.search(r'<h1[^>]*>(.*?)</h1>', webpage, flags=re.IGNORECASE | re.DOTALL)
+                title = self._clean(hm.group(1)) if hm else display_id
+            title = self.legalize(title or display_id).replace('$', '').replace('#', '')
+            if not download_url:
+                return None
+            return {"id": display_id, "title": title, "cover": cover, "play": download_url}
+        except Exception:
+            return None
+    
+    def _rec_quality(self, rec):
+        try:
+            fmt = {"video/mp4": 2, "video/webm": 1}.get(rec.get('mime_type', ''), 0)
+            w = rec.get('width') or 0
+            h = rec.get('height') or 0
+            return ((1 if rec.get('high_quality') else 0), w * h, w, h, fmt)
+        except Exception:
+            return (0, 0, 0, 0, 0)
+    
+    def _url_quality(self, u):
+        try:
+            lu = u.lower()
+            nums = [int(x) for x in re.findall(r'(?<!\d)(\d{3,4})p(?!\d)', lu)]
+            ext_m = re.search(r'\.([a-z0-9]+)(?:\?|$)', lu)
+            ext = ext_m.group(1) if ext_m else ''
+            return (max(nums) if nums else 0, 0 if any(x in lu for x in ['lq', 'iprod', 'low']) else 1, 1 if any(x in lu for x in ['hq', 'hd', 'high']) else 0, {"mp4": 3, "mkv": 2, "webm": 1}.get(ext, 0))
+        except Exception:
+            return (0, 0, 0, 0)
+    
+    def _clean(self, text):
+        try:
+            return re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', '', text or '').replace('&amp;', '&')).strip()
+        except Exception:
+            return ''
